@@ -31,6 +31,23 @@ class ConsultationService {
       contactUrgenceNom, contactUrgenceTelephone,
     } = data
 
+    if (patientId && doctorHospital && doctorSpecialty && date) {
+      const existing = await pool.query(
+        `SELECT id FROM consultations
+         WHERE patient_id = $1
+           AND doctor_hospital = $2
+           AND doctor_specialty = $3
+           AND consultation_date = $4
+           AND statut != 'transferee'`,
+        [patientId, doctorHospital, doctorSpecialty, date],
+      )
+      if (existing.rows.length > 0) {
+        throw new Error(
+          `Ce patient a déjà été consulté dans le service "${doctorSpecialty}" à "${doctorHospital}" le ${date}. Un patient ne peut être consulté qu'une seule fois par jour et par service dans le même hôpital.`,
+        )
+      }
+    }
+
     motifConsultation = encrypt(motifConsultation)
     observations = encrypt(observations)
     conclusion = encrypt(conclusion)
@@ -373,6 +390,21 @@ class ConsultationService {
 
     const orig = before.rows[0]
     const oldHospital = orig.doctor_hospital
+
+    const existingDest = await pool.query(
+      `SELECT id FROM consultations
+       WHERE patient_id = $1
+         AND doctor_hospital = $2
+         AND doctor_specialty = $3
+         AND consultation_date = $4
+         AND statut != 'transferee'`,
+      [orig.patient_id, destinationHospital, orig.doctor_specialty, orig.consultation_date],
+    )
+    if (existingDest.rows.length > 0) {
+      throw new Error(
+        `Ce patient a déjà été consulté dans le service "${orig.doctor_specialty}" à "${destinationHospital}" le ${orig.consultation_date}. Transfert impossible.`,
+      )
+    }
 
     const client = await pool.connect()
     try {

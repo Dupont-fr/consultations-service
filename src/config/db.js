@@ -114,6 +114,12 @@ const initDB = async () => {
       )
     `)
 
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_consultation_per_day
+      ON consultations (patient_id, doctor_hospital, doctor_specialty, consultation_date)
+      WHERE statut != 'transferee'
+    `)
+
     console.log('✅ Tables "consultations", "consultation_interventions" et "examens" prêtes')
   } finally {
     client.release()
