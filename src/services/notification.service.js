@@ -41,18 +41,21 @@ class NotificationService {
   }
 
   static async getUnreadCount(hospital, userId) {
-    let query = 'SELECT COUNT(*) FROM notifications WHERE read = false'
+    const conditions = []
     const params = []
     if (hospital) {
       params.push(hospital)
-      query += ` AND hospital = $${params.length}`
+      conditions.push(`hospital = $${params.length}`)
     }
     if (userId) {
       params.push(userId)
-      query += ` AND user_id = $${params.length}`
+      conditions.push(`user_id = $${params.length}`)
     }
-    if (!hospital && !userId) return 0
-    const result = await pool.query(query, params)
+    if (params.length === 0) return 0
+    const where = `AND (${conditions.join(' OR ')})`
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM notifications WHERE read = false ${where}`, params,
+    )
     return parseInt(result.rows[0].count, 10)
   }
 
