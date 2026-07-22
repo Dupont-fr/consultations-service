@@ -120,7 +120,32 @@ const initDB = async () => {
       WHERE statut != 'transferee'
     `)
 
-    console.log('✅ Tables "consultations", "consultation_interventions" et "examens" prêtes')
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        hospital VARCHAR(255),
+        user_id VARCHAR(255),
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT,
+        link VARCHAR(255),
+        data JSONB,
+        read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_hospital ON notifications(hospital) WHERE hospital IS NOT NULL
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id) WHERE user_id IS NOT NULL
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)
+    `)
+
+    console.log('✅ Tables "consultations", "consultation_interventions", "examens" et "notifications" prêtes')
   } finally {
     client.release()
   }

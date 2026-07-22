@@ -7,6 +7,7 @@ require('dotenv').config()
 const { initDB } = require('./config/db')
 const consultationRoutes = require('./routes/consultation.routes')
 const examenRoutes = require('./routes/examen.routes')
+const notificationRoutes = require('./routes/notification.routes')
 const errorHandler = require('./middlewares/errorHandler')
 
 const app = express()
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 
 app.use('/', consultationRoutes)
 app.use('/', examenRoutes)
+app.use('/', notificationRoutes)
 
 app.use(errorHandler)
 
@@ -54,6 +56,10 @@ io.on('connection', (socket) => {
 
   socket.on('join:notifications', (hospital) => {
     if (hospital) socket.join(`hospital:${hospital}`)
+  })
+
+  socket.on('join:user', (userId) => {
+    if (userId) socket.join(`user:${userId}`)
   })
 
   socket.on('disconnect', () => {

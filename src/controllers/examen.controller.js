@@ -1,4 +1,5 @@
 const ExamenService = require('../services/examen.service')
+const NotificationService = require('../services/notification.service')
 
 class ExamenController {
   static async create(req, res, next) {
@@ -15,6 +16,21 @@ class ExamenController {
           consultationId: examen.consultationId,
           type: examen.type,
         })
+      }
+
+      if (req.body.hopitalDestination) {
+        const notification = await NotificationService.create({
+          hospital: req.body.hopitalDestination,
+          type: 'examen',
+          title: 'Nouvel examen à réaliser',
+          message: `${examen.type} — Consultation #${examen.consultationId}`,
+          link: '/examens/pending',
+          data: { examenId: examen.id, consultationId: examen.consultationId },
+        })
+
+        if (req.io) {
+          req.io.to(`hospital:${req.body.hopitalDestination}`).emit('notification:new', notification)
+        }
       }
 
       res.status(201).json({ success: true, data: examen })

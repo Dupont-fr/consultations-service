@@ -1,4 +1,5 @@
 const ConsultationService = require('../services/consultation.service')
+const NotificationService = require('../services/notification.service')
 
 const SENSITIVE_FIELDS = ['motifConsultation', 'observations', 'conclusion', 'decision', 'prescription', 'poids', 'taille', 'temperature', 'tension']
 
@@ -95,6 +96,26 @@ class ConsultationController {
         doctorName: req.user?.nameUser,
         doctorSpecialty: req.user?.specialtyUser,
       })
+
+      const notification = await NotificationService.create({
+        hospital: destinationHospital,
+        type: 'transfert',
+        title: 'Consultation transférée',
+        message: `Consultation #${req.params.id} transférée depuis ${req.user?.hospitalUser || 'hôpital inconnu'}`,
+        link: `/consultations/${consultation.id || consultation._id}`,
+        data: {
+          consultationId: req.params.id,
+          newConsultationId: consultation.id || consultation._id,
+          from: req.user?.hospitalUser,
+          to: destinationHospital,
+          doctorName: req.user?.nameUser,
+        },
+      })
+
+      if (req.io) {
+        req.io.to(`hospital:${destinationHospital}`).emit('notification:new', notification)
+      }
+
       res.json({ success: true, data: stripSensitiveFields(consultation, req.user), message: 'Consultation transférée avec succès' })
     } catch (error) {
       next(error)
