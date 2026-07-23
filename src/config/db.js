@@ -74,7 +74,7 @@ const initDB = async () => {
     await addCol('transfert_par', 'VARCHAR(255)')
     await addCol('transfert_le', 'TIMESTAMP')
 
-      await client.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS consultation_interventions (
         id SERIAL PRIMARY KEY,
         consultation_id INTEGER NOT NULL REFERENCES consultations(id) ON DELETE CASCADE,
@@ -115,28 +115,6 @@ const initDB = async () => {
     `)
 
     await client.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_indexes WHERE indexname = 'idx_unique_consultation_per_day'
-        ) THEN
-          DELETE FROM consultations
-          WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM consultations
-            WHERE statut != 'transferee'
-            GROUP BY patient_id, doctor_hospital, doctor_specialty, consultation_date
-          )
-          AND statut != 'transferee';
-
-          CREATE UNIQUE INDEX idx_unique_consultation_per_day
-          ON consultations (patient_id, doctor_hospital, doctor_specialty, consultation_date)
-          WHERE statut != 'transferee';
-        END IF;
-      END $$;
-    `)
-
-    await client.query(`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         hospital VARCHAR(255),
@@ -160,6 +138,61 @@ const initDB = async () => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)
     `)
+
+    try {
+      const indexExists = await client.query(
+        `SELECT 1 FROM pg_indexes WHERE indexname = 'idx_unique_consultation_per_day'`
+      )
+      if (indexExists.rows.length === 0) {
+        await client.query(`
+          DELETE FROM consultation_interventions
+          WHERE consultation_id IN (
+            SELECT c1.id FROM consultations c1
+            INNER JOIN consultations c2
+              ON c1.patient_id = c2.patient_id
+              AND c1.doctor_hospital = c2.doctor_hospital
+              AND c1.doctor_specialty = c2.doctor_specialty
+              AND c1.consultation_date = c2.consultation_date
+              AND c1.id > c2.id
+            WHERE c1.statut != 'transferee' AND c2.statut != 'transferee'
+          )
+        `)
+        await client.query(`
+          DELETE FROM examens
+          WHERE consultation_id IN (
+            SELECT c1.id FROM consultations c1
+            INNER JOIN consultations c2
+              ON c1.patient_id = c2.patient_id
+              AND c1.doctor_hospital = c2.doctor_hospital
+              AND c1.doctor_specialty = c2.doctor_specialty
+              AND c1.consultation_date = c2.consultation_date
+              AND c1.id > c2.id
+            WHERE c1.statut != 'transferee' AND c2.statut != 'transferee'
+          )
+        `)
+        await client.query(`
+          DELETE FROM consultations
+          WHERE id IN (
+            SELECT c1.id FROM consultations c1
+            INNER JOIN consultations c2
+              ON c1.patient_id = c2.patient_id
+              AND c1.doctor_hospital = c2.doctor_hospital
+              AND c1.doctor_specialty = c2.doctor_specialty
+              AND c1.consultation_date = c2.consultation_date
+              AND c1.id > c2.id
+            WHERE c1.statut != 'transferee' AND c2.statut != 'transferee'
+          )
+        `)
+        await client.query(`
+          CREATE UNIQUE INDEX idx_unique_consultation_per_day
+          ON consultations (patient_id, doctor_hospital, doctor_specialty, consultation_date)
+          WHERE statut != 'transferee'
+        `)
+        console.log('✅ Index unique idx_unique_consultation_per_day créé après nettoyage des doublons')
+      }
+    } catch (idxErr) {
+      console.error('⚠️ Impossible de créer l\'index unique (non bloquant):', idxErr.message)
+    }
 
     console.log('✅ Tables "consultations", "consultation_interventions", "examens" et "notifications" prêtes')
   } finally {
