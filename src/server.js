@@ -28,9 +28,14 @@ app.get('/health', (req, res) => {
   res.json({ success: true, message: 'Consultation Service is running' })
 })
 
+app.use((req, res, next) => {
+  req.io = io
+  next()
+})
+
+app.use('/', notificationRoutes)
 app.use('/', consultationRoutes)
 app.use('/', examenRoutes)
-app.use('/', notificationRoutes)
 
 app.use(errorHandler)
 
@@ -44,11 +49,6 @@ const io = new Server(server, {
     },
     methods: ['GET', 'POST'],
   },
-})
-
-app.use((req, res, next) => {
-  req.io = io
-  next()
 })
 
 io.on('connection', (socket) => {
