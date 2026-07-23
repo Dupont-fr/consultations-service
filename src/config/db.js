@@ -115,9 +115,25 @@ const initDB = async () => {
     `)
 
     await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_consultation_per_day
-      ON consultations (patient_id, doctor_hospital, doctor_specialty, consultation_date)
-      WHERE statut != 'transferee'
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_indexes WHERE indexname = 'idx_unique_consultation_per_day'
+        ) THEN
+          DELETE FROM consultations
+          WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM consultations
+            WHERE statut != 'transferee'
+            GROUP BY patient_id, doctor_hospital, doctor_specialty, consultation_date
+          )
+          AND statut != 'transferee';
+
+          CREATE UNIQUE INDEX idx_unique_consultation_per_day
+          ON consultations (patient_id, doctor_hospital, doctor_specialty, consultation_date)
+          WHERE statut != 'transferee';
+        END IF;
+      END $$;
     `)
 
     await client.query(`
