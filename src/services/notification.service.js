@@ -40,6 +40,21 @@ class NotificationService {
     }
   }
 
+  static async getGlobal({ page = 1, limit = 50 } = {}) {
+    const offset = (page - 1) * limit
+    const result = await pool.query(
+      `SELECT * FROM notifications WHERE hospital IS NULL AND user_id IS NULL ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset],
+    )
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM notifications WHERE hospital IS NULL AND user_id IS NULL`,
+    )
+    return {
+      data: result.rows.map(this.formatRow),
+      total: parseInt(countResult.rows[0].count, 10),
+    }
+  }
+
   static async getUnreadCount(hospital, userId) {
     const conditions = []
     const params = []
@@ -51,8 +66,8 @@ class NotificationService {
       params.push(userId)
       conditions.push(`user_id = $${params.length}`)
     }
-    if (params.length === 0) return 0
-    const where = `AND (${conditions.join(' OR ')})`
+    conditions.push(`(hospital IS NULL AND user_id IS NULL)`)
+    const where = params.length > 0 ? `AND (${conditions.join(' OR ')})` : ''
     const result = await pool.query(
       `SELECT COUNT(*) FROM notifications WHERE read = false ${where}`, params,
     )
@@ -74,8 +89,8 @@ class NotificationService {
       params.push(userId)
       conditions.push(`user_id = $${params.length}`)
     }
-    if (params.length === 0) return
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' OR ')}` : ''
+    conditions.push(`(hospital IS NULL AND user_id IS NULL)`)
+    const where = params.length > 0 ? `WHERE (${conditions.join(' OR ')})` : ''
     await pool.query(`UPDATE notifications SET read = true ${where}`, params)
   }
 

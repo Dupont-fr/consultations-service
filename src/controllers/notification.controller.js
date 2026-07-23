@@ -11,9 +11,10 @@ class NotificationController {
       if (req.user?.role === 'ADMIN') {
         const r1 = hospital ? await NotificationService.getByHospital(hospital, { page, limit }) : { data: [], total: 0 }
         const r2 = userId ? await NotificationService.getByUserId(userId, { page, limit }) : { data: [], total: 0 }
-        const merged = [...r1.data, ...r2.data]
+        const r3 = await NotificationService.getGlobal({ page, limit })
+        const merged = [...r1.data, ...r2.data, ...r3.data]
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        result = { data: merged, total: r1.total + r2.total }
+        result = { data: merged, total: r1.total + r2.total + r3.total }
       } else if (hospital) {
         result = await NotificationService.getByHospital(hospital, { page, limit })
       } else if (userId) {
